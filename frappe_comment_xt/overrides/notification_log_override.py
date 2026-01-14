@@ -7,7 +7,8 @@ class NotificationLogOverride(NotificationLog):
     def after_insert(self):
         if self.type == "Mention":
             self.update_comment_link()
-            self.save()
+            if self.has_value_changed("link"):
+                self.save()
         super().after_insert()
 
     def update_comment_link(self):
@@ -35,4 +36,3 @@ class NotificationLogOverride(NotificationLog):
 
         if comment_name:
             self.link = get_url_to_form(self.document_type, self.document_name) + f"#comment-{comment_name}"
-            self.save()
