@@ -3,6 +3,9 @@ name: Bench Build Test
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.repository }}-${{ github.event.number }}
   cancel-in-progress: true
