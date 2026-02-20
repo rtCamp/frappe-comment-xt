@@ -26,11 +26,24 @@ function get_comment_visibility_icons(visibility) {
     </svg>`;
 }
 
+function escapeHTML(str) {
+  if (str == null) {
+    return "";
+  }
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function update_the_comment_visibility(visibility) {
   if (visibility) {
+    const safeVisibility = escapeHTML(visibility);
     return `
-            <span class="visibility-container" title="${visibility}">
-                <span class="visibility-info" data-visibility="${visibility}">
+            <span class="visibility-container" title="${safeVisibility}">
+                <span class="visibility-info" data-visibility="${safeVisibility}">
                     ${get_comment_visibility_icons(visibility)}
                 </span>
             </span>`;
