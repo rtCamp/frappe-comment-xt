@@ -28,7 +28,20 @@ def add_comments_in_timeline(doc, docinfo):
     # Get only parent comments
     comments = frappe.get_all(
         "Comment",
-        fields="*",
+        fields=[
+            "name",
+            "owner",
+            "creation",
+            "modified",
+            "comment_type",
+            "comment_email",
+            "comment_by",
+            "content",
+            "reference_doctype",
+            "reference_name",
+            "custom_visibility",
+            "custom_reply_to",
+        ],
         filters={
             "reference_doctype": doc.doctype,
             "reference_name": doc.name,

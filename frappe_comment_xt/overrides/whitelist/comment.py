@@ -127,7 +127,18 @@ def get_all_replies(reference_doctype: str, reference_name: str):
             "reference_doctype": reference_doctype,
             "reference_name": reference_name,
         },
-        fields="*",
+        fields=[
+            "name",
+            "owner",
+            "creation",
+            "modified",
+            "comment_type",
+            "comment_email",
+            "comment_by",
+            "content",
+            "custom_reply_to",
+            "custom_visibility",
+        ],
         order_by="creation DESC",
     )
     filtered_replies = filter_comments_by_visibility(replies, frappe.session.user)
