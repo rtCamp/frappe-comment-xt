@@ -6,6 +6,8 @@ __version__ = "0.0.1"
 def patch_add_comments_in_timeline():
     import frappe
 
+    # in shared bench this is required so it won't break other apps that use add_comments in their codebase.
+    # This is a safe check as the patch will only be applied if the app is installed in the site.
     if "frappe_comment_xt" not in frappe.get_installed_apps():
         return
     import frappe.desk.form.load as frappe_load
