@@ -28,7 +28,20 @@ def add_comments_in_timeline(doc, docinfo):
     # Get only parent comments
     comments = frappe.get_all(
         "Comment",
-        fields="*",
+        fields=[
+            "name",
+            "owner",
+            "creation",
+            "modified",
+            "comment_type",
+            "comment_email",
+            "comment_by",
+            "content",
+            "reference_doctype",
+            "reference_name",
+            "custom_visibility",
+            "custom_reply_to",
+        ],
         filters={
             "reference_doctype": doc.doctype,
             "reference_name": doc.name,
@@ -64,31 +77,42 @@ def filter_comments_by_visibility(comments, user):
     Filter comments based on the visibility settings
     Only show comments that the user is allowed to see
     """
+    if user == "Administrator":
+        return comments
+
     filtered_comments = []
 
-    if user != "Administrator":
-        for comment in comments:
-            if comment.custom_visibility == "Visible to only you":
-                if comment.owner == user:
-                    filtered_comments.append(comment)
+    # Collect comment names that need mentioned-user check
+    mentioned_visibility_comments = [c.name for c in comments if c.custom_visibility == "Visible to mentioned"]
 
-            elif comment.custom_visibility == "Visible to mentioned":
-                member = frappe.db.get_all(
-                    "User Group Member",
-                    filters={
-                        "user": user,
-                        "parent": comment.name,
-                        "parenttype": "Comment",
-                    },
-                )
+    # Batch fetch all User Group Member records for this user
+    user_mentioned_in = set()
+    if mentioned_visibility_comments:
+        members = frappe.db.get_all(
+            "User Group Member",
+            filters={
+                "user": user,
+                "parent": ["in", mentioned_visibility_comments],
+                "parenttype": "Comment",
+            },
+            fields=["parent"],
+        )
+        user_mentioned_in = {m.parent for m in members}
 
-                if comment.owner == user or (len(member) > 0):
-                    filtered_comments.append(comment)
-
-            else:
+    # Now filter without additional queries
+    for comment in comments:
+        if comment.custom_visibility == "Visible to only you":
+            if comment.owner == user:
                 filtered_comments.append(comment)
-    else:
-        filtered_comments = comments
+
+        elif comment.custom_visibility == "Visible to mentioned":
+            # O(1) lookup instead of query
+            if comment.owner == user or comment.name in user_mentioned_in:
+                filtered_comments.append(comment)
+
+        else:
+            filtered_comments.append(comment)
+
     return filtered_comments
 
 
