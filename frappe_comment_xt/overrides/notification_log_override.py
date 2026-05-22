@@ -6,14 +6,17 @@ from frappe.utils.data import get_url_to_form
 class NotificationLogOverride(NotificationLog):
     def after_insert(self):
         if self.type == "Mention":
-            self.update_comment_link()
-            self.save()
+            if self.update_comment_link():
+                self.save()
         super().after_insert()
 
     def update_comment_link(self):
         """
         There is no direct link between the comment and the notification log.
         We determine the comment id by using the content of the email and the most recently created comment, as the comment is created before the notification log.
+
+        Returns:
+            bool: True if a comment link was found and set, False otherwise
         """
         comments = frappe.get_all(
             "Comment",
@@ -35,4 +38,5 @@ class NotificationLogOverride(NotificationLog):
 
         if comment_name:
             self.link = get_url_to_form(self.document_type, self.document_name) + f"#comment-{comment_name}"
-            self.save()
+            return True
+        return False
