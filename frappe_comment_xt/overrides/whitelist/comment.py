@@ -22,7 +22,7 @@ def add_comment_override(
     comment_by: str,
     custom_visibility: str = "Visible to everyone",
     custom_reply_to: str | None = None,
-) -> "Comment":
+) -> Comment:
     """Allow logged user with permission to read document to add a comment"""
     reference_doc = frappe.get_doc(reference_doctype, reference_name)
     reference_doc.check_permission()

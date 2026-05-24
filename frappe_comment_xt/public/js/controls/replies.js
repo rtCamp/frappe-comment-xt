@@ -14,7 +14,13 @@ function add_reply_button(time_line_item) {
   $(time_line_item).find(".custom-actions").append(replyButton);
 }
 
-function render_replies(commentSelector, commentId, allReplies, decrease_margin = false, comment_level = 1) {
+function render_replies(
+  commentSelector,
+  commentId,
+  allReplies,
+  decrease_margin = false,
+  comment_level = 1,
+) {
   /*
    * Recursively render replies for a comment
    * allReplies: an object with commentId as key and an array of replies as value
@@ -44,8 +50,8 @@ function render_replies(commentSelector, commentId, allReplies, decrease_margin 
                     </svg>
                 </div>
                 <div class="timeline-item frappe-card" data-doctype="Reply" data-level="${comment_level}" data-visibility="${
-      reply.custom_visibility
-    }" id="comment-${reply.name}" data-name="${reply.name}">
+                  reply.custom_visibility
+                }" id="comment-${reply.name}" data-name="${reply.name}">
                     <div class="timeline-content">
                         <div class="timeline-message-box">
                             <div>
@@ -53,14 +59,18 @@ function render_replies(commentSelector, commentId, allReplies, decrease_margin 
                                 <span class="text-muted">
                                     ${frappe.avatar(reply.comment_email, "avatar-medium")}
                                     <span class="timeline-user">${
-                                      reply.comment_by === frappe.session.user_fullname ? "You" : reply.comment_by
+                                      reply.comment_by ===
+                                      frappe.session.user_fullname
+                                        ? "You"
+                                        : reply.comment_by
                                     } commented . </span>
                                     <span>&nbsp; ${frappe.datetime.comment_when(reply.creation)}</span>
                                 </span>
                               ${update_the_comment_visibility(
-                                frappe.session.user === "Administrator" || reply.comment_email === frappe.session.user
+                                frappe.session.user === "Administrator" ||
+                                  reply.comment_email === frappe.session.user
                                   ? reply.custom_visibility
-                                  : null
+                                  : null,
                               )}
                               </div>
                             </div>
@@ -95,33 +105,38 @@ function render_replies(commentSelector, commentId, allReplies, decrease_margin 
         "aria-haspopup": "true",
         "aria-expanded": "false",
       })
-      .html('<svg class="icon icon-sm"><use href="#icon-dot-horizontal"></use></svg>');
+      .html(
+        '<svg class="icon icon-sm"><use href="#icon-dot-horizontal"></use></svg>',
+      );
     const dropdownMenu = $("<div>")
       .addClass("dropdown-menu small dropdown-menu-right")
       .append(
         $("<a>")
           .addClass("dropdown-item")
           .html("Copy Link")
-          .on("click", () => handle_reply_copy("#comment-" + reply.name))
+          .on("click", () => handle_reply_copy("#comment-" + reply.name)),
       );
 
     // if owner or administrator, add the delete button
     if (
       frappe.model.can_delete("Comment") &&
-      (frappe.session.user === "Administrator" || reply.comment_email === frappe.session.user)
+      (frappe.session.user === "Administrator" ||
+        reply.comment_email === frappe.session.user)
     ) {
       dropdownMenu.append(
         $("<a>")
           .addClass("dropdown-item")
           .html("Delete")
-          .on("click", () => handle_reply_delete("#comment-" + reply.name))
+          .on("click", () => handle_reply_delete("#comment-" + reply.name)),
       );
     }
 
     const editButton = $("<button>")
       .addClass("btn btn-xs small")
       .html("Edit")
-      .on("click", () => handle_reply_edit(commentSelector, "#comment-" + reply.name));
+      .on("click", () =>
+        handle_reply_edit(commentSelector, "#comment-" + reply.name),
+      );
 
     moreButton.append(dropdownMenu);
     if (reply.comment_email === frappe.session.user) {
@@ -137,7 +152,13 @@ function render_replies(commentSelector, commentId, allReplies, decrease_margin 
   $comment.after($replyContainer);
 
   replies.forEach((reply) => {
-    render_replies("#comment-" + reply.name, reply.name, allReplies, true, comment_level + 1);
+    render_replies(
+      "#comment-" + reply.name,
+      reply.name,
+      allReplies,
+      true,
+      comment_level + 1,
+    );
   });
 }
 
@@ -167,7 +188,13 @@ function addThreadedReply(commentSelector, doctype, docname) {
         return;
       }
 
-      render_replies(commentSelector, commentId, res.message, isReply, commentLevel + 1);
+      render_replies(
+        commentSelector,
+        commentId,
+        res.message,
+        isReply,
+        commentLevel + 1,
+      );
     },
   });
 }
@@ -177,7 +204,9 @@ function handle_reply(time_line_item) {
    * Handle the reply button click event
    */
   // if on Edit Mode, click on `Dismiss` button
-  const parentDismiss = $(time_line_item).find(".custom-actions.save-open > button:nth-child(2)");
+  const parentDismiss = $(time_line_item).find(
+    ".custom-actions.save-open > button:nth-child(2)",
+  );
   if (parentDismiss.length) {
     parentDismiss.click();
   }
@@ -187,7 +216,9 @@ function handle_reply(time_line_item) {
   }
 
   const $timeLineItem = $(time_line_item);
-  const replyingToName = frappe.utils.escape_html($timeLineItem.find(".avatar.avatar-medium").attr("title"));
+  const replyingToName = frappe.utils.escape_html(
+    $timeLineItem.find(".avatar.avatar-medium").attr("title"),
+  );
   if ($timeLineItem.find(".reply-container").length) {
     return;
   }
@@ -267,7 +298,7 @@ function handle_reply(time_line_item) {
     {
       scrollTop: replyContainer.offset().top - $(window).height() / 2,
     },
-    1000
+    1000,
   );
   replyContainer.find(".ql-editor.ql-blank").focus();
 }
@@ -292,7 +323,11 @@ function submit_reply(time_line_item, content, visibility) {
         $(time_line_item).find(".reply-container").remove();
         frappe.utils.play_sound("click");
         update_comments_timeline();
-        addThreadedReply(time_line_item, this.cur_frm.doctype, this.cur_frm.docname);
+        addThreadedReply(
+          time_line_item,
+          this.cur_frm.doctype,
+          this.cur_frm.docname,
+        );
       }
     },
   });
@@ -305,7 +340,8 @@ function handle_reply_copy(commentSelector) {
   const $comment = $(commentSelector);
   const commentId = $comment.data("name");
   const currentUrl =
-    frappe.urllib.get_base_url() + frappe.utils.get_form_link(this.cur_frm.doctype, this.cur_frm.docname);
+    frappe.urllib.get_base_url() +
+    frappe.utils.get_form_link(this.cur_frm.doctype, this.cur_frm.docname);
   const commentUrl = `${currentUrl}#comment-${commentId}`;
   frappe.utils.copy_to_clipboard(commentUrl);
 }
@@ -385,13 +421,19 @@ function handle_reply_edit(parentComment, commentSelector) {
         <div class="select-input form-control" >
           <select name="visibility" id="visibility" data-label="visibility" data-fieldtype="Select" >
             <option value="Visible to everyone" ${
-              $comment.data("visibility") === "Visible to everyone" ? "selected" : ""
+              $comment.data("visibility") === "Visible to everyone"
+                ? "selected"
+                : ""
             }>Visible to everyone</option>
             <option value="Visible to mentioned" ${
-              $comment.data("visibility") === "Visible to mentioned" ? "selected" : ""
+              $comment.data("visibility") === "Visible to mentioned"
+                ? "selected"
+                : ""
             }>Visible to mentioned</option>
             <option value="Visible to only you" ${
-              $comment.data("visibility") === "Visible to only you" ? "selected" : ""
+              $comment.data("visibility") === "Visible to only you"
+                ? "selected"
+                : ""
             }>Visible to only you</option>
           </select>
           <div class="select-icon">

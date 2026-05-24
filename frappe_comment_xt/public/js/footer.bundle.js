@@ -57,11 +57,13 @@ frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
               custom_visibility: custom_visibility,
             })
             .then((comment) => {
-              let comment_item = this.frm.timeline.get_comment_timeline_item(comment);
+              let comment_item =
+                this.frm.timeline.get_comment_timeline_item(comment);
               this.frm.comment_box.set_value("");
               frappe.utils.play_sound("click");
               this.frm.timeline.add_timeline_item(comment_item);
-              this.frm.sidebar.refresh_comments_count && this.frm.sidebar.refresh_comments_count();
+              this.frm.sidebar.refresh_comments_count &&
+                this.frm.sidebar.refresh_comments_count();
             })
             .finally(() => {
               this.frm.comment_box.enable();
@@ -93,11 +95,13 @@ frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
         // No replies found
         if (!res.message || Object.keys(res.message).length === 0) return;
 
-        $timelineItems.find('.timeline-item[data-doctype="Comment"]').each(function () {
-          const $item = $(this);
-          const commentId = $item.data("name");
-          render_replies($item, commentId, res.message);
-        });
+        $timelineItems
+          .find('.timeline-item[data-doctype="Comment"]')
+          .each(function () {
+            const $item = $(this);
+            const commentId = $item.data("name");
+            render_replies($item, commentId, res.message);
+          });
       },
     });
   }
