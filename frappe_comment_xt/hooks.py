@@ -1,3 +1,5 @@
+from .monkey_patch import patch
+
 app_name = "frappe_comment_xt"
 app_title = "Frappe Comment Xt"
 app_publisher = "rtCamp"
@@ -248,3 +250,6 @@ override_whitelisted_methods = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
+
+
+patch()
