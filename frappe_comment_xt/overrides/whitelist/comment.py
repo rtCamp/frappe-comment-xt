@@ -1,4 +1,5 @@
 import frappe
+from frappe.core.doctype.comment.comment import Comment
 from frappe.core.doctype.file.utils import extract_images_from_html
 from frappe.desk.doctype.notification_log.notification_log import enqueue_create_notification
 from frappe.desk.form.document_follow import follow_document
@@ -17,7 +18,7 @@ def add_comment_override(
     comment_by: str,
     custom_visibility: str = "Visible to everyone",
     custom_reply_to: str | None = None,
-):
+) -> Comment:
     """Allow logged user with permission to read document to add a comment"""
     reference_doc = frappe.get_doc(reference_doctype, reference_name)
     reference_doc.check_permission()
