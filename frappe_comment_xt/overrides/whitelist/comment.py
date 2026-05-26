@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import frappe
-from frappe.core.doctype.comment.comment import Comment
 from frappe.core.doctype.file.utils import extract_images_from_html
 from frappe.desk.doctype.notification_log.notification_log import enqueue_create_notification
 from frappe.desk.form.document_follow import follow_document
@@ -7,6 +10,9 @@ from frappe.utils import strip_html_tags
 from frappe.utils.html_utils import clean_email_html
 
 from frappe_comment_xt.helpers.comment import filter_comments_by_visibility, get_mention_user, get_thread_participants
+
+if TYPE_CHECKING:
+    from frappe.core.doctype.comment.comment import Comment
 
 
 @frappe.whitelist(methods=["POST", "PUT"])
@@ -123,18 +129,7 @@ def get_all_replies(reference_doctype: str, reference_name: str):
             "reference_doctype": reference_doctype,
             "reference_name": reference_name,
         },
-        fields=[
-            "name",
-            "owner",
-            "creation",
-            "modified",
-            "comment_type",
-            "comment_email",
-            "comment_by",
-            "content",
-            "custom_reply_to",
-            "custom_visibility",
-        ],
+        fields="*",
         order_by="creation DESC",
     )
     filtered_replies = filter_comments_by_visibility(replies, frappe.session.user)
