@@ -1,6 +1,6 @@
 # Copyright (c) 2026, rtCamp and Contributors
 # See license.txt
-"""Visibility filtering in get_all_replies, and the un-mention revocation path through update_comment_override."""
+"""Visibility filtering in get_all_replies, thread-notification gating in add_comment_override, and the edit/update endpoint update_comment_override."""
 
 from unittest.mock import patch
 
@@ -300,3 +300,100 @@ class TestAddCommentThreadNotifications(IntegrationTestCase):
         # Comment still inserted despite the exception in the notification block
         self.assertTrue(frappe.db.exists("Comment", comment.name))
         mock_log_error.assert_called()
+
+
+class TestUpdateCommentOverride(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        make_test_user(TEST_USER)
+        make_test_user(TEST_USER_2)
+        make_test_tag()
+
+    def test_owner_can_update(self):
+        """The comment's owner may update content and visibility."""
+        comment = make_test_comment(owner=TEST_USER, content="before")
+        with as_user(TEST_USER):
+            update_comment_override(
+                name=comment.name,
+                content="after",
+                custom_visibility="Visible to only you",
+            )
+        updated = frappe.get_doc("Comment", comment.name)
+        self.assertEqual(updated.content, "after")
+        self.assertEqual(updated.custom_visibility, "Visible to only you")
+
+    def test_administrator_can_update(self):
+        """Administrator may update any comment regardless of ownership."""
+        comment = make_test_comment(owner=TEST_USER, content="before")
+        with as_user("Administrator"):
+            update_comment_override(
+                name=comment.name,
+                content="admin edit",
+                custom_visibility="Visible to mentioned",
+            )
+        updated = frappe.get_doc("Comment", comment.name)
+        self.assertEqual(updated.content, "admin edit")
+        self.assertEqual(updated.custom_visibility, "Visible to mentioned")
+
+    def test_non_owner_non_admin_cannot_update(self):
+        """A user who is neither the comment's owner nor Administrator gets a PermissionError."""
+        comment = make_test_comment(owner=TEST_USER, content="mine")
+        with as_user(TEST_USER_2), self.assertRaises(frappe.PermissionError):
+            update_comment_override(
+                name=comment.name,
+                content="hijacked",
+                custom_visibility="Visible to everyone",
+            )
+        # Comment content unchanged
+        self.assertEqual(frappe.db.get_value("Comment", comment.name, "content"), "mine")
+
+    def test_empty_visibility_returns_none_and_does_not_modify(self):
+        """Calling with empty custom_visibility returns None and leaves the comment untouched (short-circuits before any permission or content path)."""
+        comment = make_test_comment(owner=TEST_USER, content="before")
+        with as_user(TEST_USER):
+            result = update_comment_override(
+                name=comment.name,
+                content="should not apply",
+                custom_visibility="",
+            )
+        self.assertIsNone(result)
+        self.assertEqual(frappe.db.get_value("Comment", comment.name, "content"), "before")
+
+    def test_reference_doc_permission_is_rechecked(self):
+        """update_comment_override calls check_permission() on the reference doc before applying content changes."""
+        comment = make_test_comment(owner=TEST_USER, content="original")
+
+        captured = []
+        original_check = frappe.model.document.Document.check_permission
+
+        def capturing(self_doc, *args, **kwargs):
+            captured.append((self_doc.doctype, self_doc.name))
+            return original_check(self_doc, *args, **kwargs)
+
+        with (
+            patch.object(frappe.model.document.Document, "check_permission", capturing),
+            as_user(TEST_USER),
+        ):
+            update_comment_override(
+                name=comment.name,
+                content="updated",
+                custom_visibility="Visible to everyone",
+            )
+
+        self.assertIn(("Tag", TEST_TAG), captured)
+
+    def test_mentions_recomputed_from_content(self):
+        """custom_mentions is rebuilt from the new content; previously-absent mentions appear and previously-present ones disappear."""
+        comment = make_test_comment(owner=TEST_USER, content="no mentions")
+
+        new_content = f'<span class="mention" data-id="{TEST_USER_2}">@user2</span> mentioned now'
+        with as_user(TEST_USER):
+            update_comment_override(
+                name=comment.name,
+                content=new_content,
+                custom_visibility="Visible to everyone",
+            )
+
+        updated = frappe.get_doc("Comment", comment.name)
+        self.assertEqual([m.user for m in updated.custom_mentions], [TEST_USER_2])
