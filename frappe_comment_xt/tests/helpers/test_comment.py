@@ -145,3 +145,28 @@ class TestAddCommentsInTimelineVisibility(IntegrationTestCase):
         timeline_names = {c.name for c in docinfo.comments}
         self.assertIn(public.name, timeline_names)
         self.assertNotIn(private.name, timeline_names)
+
+
+class TestAddCommentsInTimelineReplyFilter(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        make_test_user(TEST_USER)
+        make_test_tag()
+
+    def test_timeline_excludes_replies(self):
+        """add_comments_in_timeline returns only top-level comments; entries with a custom_reply_to are not included."""
+        parent = make_test_comment(owner=TEST_USER, content="top-level")
+        reply = make_test_comment(
+            owner=TEST_USER,
+            content="reply",
+            custom_reply_to=parent.name,
+        )
+
+        doc = frappe._dict(doctype="Tag", name=TEST_TAG)
+        docinfo = frappe._dict()
+        add_comments_in_timeline(doc, docinfo)
+
+        timeline_names = {c.name for c in docinfo.comments}
+        self.assertIn(parent.name, timeline_names)
+        self.assertNotIn(reply.name, timeline_names)
