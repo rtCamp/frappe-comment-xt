@@ -2,11 +2,14 @@
 # See license.txt
 """Visibility filtering in get_all_replies, and the un-mention revocation path through update_comment_override."""
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
 from frappe_comment_xt.helpers.comment import filter_comments_by_visibility
 from frappe_comment_xt.overrides.whitelist.comment import (
+    add_comment_override,
     get_all_replies,
     update_comment_override,
 )
@@ -14,6 +17,7 @@ from frappe_comment_xt.tests import (
     TEST_TAG,
     TEST_USER,
     TEST_USER_2,
+    TEST_USER_3,
     as_user,
     make_test_comment,
     make_test_tag,
@@ -187,3 +191,112 @@ class TestUpdateCommentMentionsRevocation(IntegrationTestCase):
             filter_comments_by_visibility(comments_view, TEST_USER_2),
             [],
         )
+
+
+class TestAddCommentThreadNotifications(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        make_test_user(TEST_USER)
+        make_test_user(TEST_USER_2)
+        make_test_user(TEST_USER_3)
+        make_test_tag()
+
+    def _post_reply(self, parent_name, content="reply", visibility="Visible to everyone", as_who=TEST_USER_2):
+        """Post a reply via add_comment_override under a given session user; returns the patch mock for enqueue_create_notification."""
+        with patch("frappe_comment_xt.overrides.whitelist.comment.enqueue_create_notification") as mock_notify:
+            with as_user(as_who):
+                add_comment_override(
+                    reference_doctype="Tag",
+                    reference_name=TEST_TAG,
+                    content=content,
+                    comment_email=as_who,
+                    comment_by=as_who,
+                    custom_visibility=visibility,
+                    custom_reply_to=parent_name,
+                )
+        return mock_notify
+
+    def test_notifies_thread_participants(self):
+        """A reply to a thread notifies the original commenter and prior repliers."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        make_test_comment(owner=TEST_USER_3, content="prior reply", custom_reply_to=parent.name)
+
+        mock_notify = self._post_reply(parent.name)
+
+        recipients = set(mock_notify.call_args[0][0])
+        self.assertIn(TEST_USER, recipients)
+        self.assertIn(TEST_USER_3, recipients)
+
+    def test_replier_excluded_from_recipients(self):
+        """The user posting the reply is removed from the recipient list."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        mock_notify = self._post_reply(parent.name, as_who=TEST_USER_2)
+
+        recipients = set(mock_notify.call_args[0][0])
+        self.assertNotIn(TEST_USER_2, recipients)
+
+    def test_users_mentioned_in_reply_excluded_from_recipients(self):
+        """Users mentioned in the new reply are not in the thread-participant recipients (they get a separate Mention notification)."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        make_test_comment(owner=TEST_USER_3, content="prior reply", custom_reply_to=parent.name)
+
+        # Reply mentions TEST_USER_3 inline; they should be removed from thread recipients
+        mention_span = f'<span class="mention" data-id="{TEST_USER_3}">@user3</span> heads up'
+        mock_notify = self._post_reply(parent.name, content=mention_span)
+
+        recipients = set(mock_notify.call_args[0][0])
+        self.assertNotIn(TEST_USER_3, recipients)
+        # Original commenter is still notified
+        self.assertIn(TEST_USER, recipients)
+
+    def test_private_reply_does_not_notify(self):
+        """A Visible-to-only-you reply does not enqueue any thread notification."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        mock_notify = self._post_reply(parent.name, visibility="Visible to only you")
+        mock_notify.assert_not_called()
+
+    def test_mentioned_visibility_reply_does_not_notify(self):
+        """A Visible-to-mentioned reply does not enqueue any thread notification."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        mock_notify = self._post_reply(parent.name, visibility="Visible to mentioned")
+        mock_notify.assert_not_called()
+
+    def test_first_level_comment_does_not_notify(self):
+        """A top-level comment (no custom_reply_to) does not enqueue any thread notification."""
+        with patch("frappe_comment_xt.overrides.whitelist.comment.enqueue_create_notification") as mock_notify:
+            with as_user(TEST_USER):
+                add_comment_override(
+                    reference_doctype="Tag",
+                    reference_name=TEST_TAG,
+                    content="top-level",
+                    comment_email=TEST_USER,
+                    comment_by=TEST_USER,
+                    custom_visibility="Visible to everyone",
+                )
+        mock_notify.assert_not_called()
+
+    def test_exception_in_notification_is_logged_and_swallowed(self):
+        """If the notification block raises, the error is caught via frappe.log_error and the comment insert still succeeds."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+
+        with (
+            patch(
+                "frappe_comment_xt.overrides.whitelist.comment.enqueue_create_notification",
+                side_effect=RuntimeError("kaboom"),
+            ),
+            patch("frappe.log_error") as mock_log_error,
+            as_user(TEST_USER_2),
+        ):
+            comment = add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="reply",
+                comment_email=TEST_USER_2,
+                comment_by=TEST_USER_2,
+                custom_reply_to=parent.name,
+            )
+
+        # Comment still inserted despite the exception in the notification block
+        self.assertTrue(frappe.db.exists("Comment", comment.name))
+        mock_log_error.assert_called()

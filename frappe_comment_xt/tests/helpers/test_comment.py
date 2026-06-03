@@ -8,6 +8,7 @@ from frappe.tests import IntegrationTestCase
 from frappe_comment_xt.helpers.comment import (
     add_comments_in_timeline,
     filter_comments_by_visibility,
+    get_thread_participants,
 )
 from frappe_comment_xt.tests import (
     TEST_TAG,
@@ -170,3 +171,46 @@ class TestAddCommentsInTimelineReplyFilter(IntegrationTestCase):
         timeline_names = {c.name for c in docinfo.comments}
         self.assertIn(parent.name, timeline_names)
         self.assertNotIn(reply.name, timeline_names)
+
+
+class TestGetThreadParticipants(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        make_test_user(TEST_USER)
+        make_test_user(TEST_USER_2)
+        make_test_user(TEST_USER_3)
+        make_test_tag()
+
+    def test_includes_original_commenter(self):
+        """The original commenter's email is in the participant set."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        self.assertIn(TEST_USER, get_thread_participants(parent.name))
+
+    def test_includes_thread_repliers(self):
+        """Every user who has replied in the thread is in the participant set."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        make_test_comment(owner=TEST_USER_2, content="r1", custom_reply_to=parent.name)
+        make_test_comment(owner=TEST_USER_3, content="r2", custom_reply_to=parent.name)
+
+        result = get_thread_participants(parent.name)
+        self.assertIn(TEST_USER_2, result)
+        self.assertIn(TEST_USER_3, result)
+
+    def test_includes_mentions_from_original_comment(self):
+        """Users mentioned in the original comment are in the participant set."""
+        parent = make_test_comment(
+            owner=TEST_USER,
+            content="hi",
+            mentions=[TEST_USER_2, TEST_USER_3],
+        )
+        result = get_thread_participants(parent.name)
+        self.assertIn(TEST_USER_2, result)
+        self.assertIn(TEST_USER_3, result)
+
+    def test_none_values_are_dropped(self):
+        """If a contributing field is NULL in the DB, None never appears in the returned set."""
+        parent = make_test_comment(owner=TEST_USER, content="parent")
+        # Force comment_email NULL to simulate the missing-data path the helper guards against
+        frappe.db.set_value("Comment", parent.name, "comment_email", None)
+        self.assertNotIn(None, get_thread_participants(parent.name))
