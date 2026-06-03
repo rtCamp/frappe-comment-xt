@@ -11,6 +11,7 @@ from frappe_comment_xt.helpers.comment import filter_comments_by_visibility
 from frappe_comment_xt.overrides.whitelist.comment import (
     add_comment_override,
     get_all_replies,
+    get_comment_visibility,
     update_comment_override,
 )
 from frappe_comment_xt.tests import (
@@ -397,3 +398,33 @@ class TestUpdateCommentOverride(IntegrationTestCase):
 
         updated = frappe.get_doc("Comment", comment.name)
         self.assertEqual([m.user for m in updated.custom_mentions], [TEST_USER_2])
+
+
+class TestGetCommentVisibility(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        make_test_user(TEST_USER)
+        make_test_user(TEST_USER_2)
+        make_test_tag()
+
+    def test_owner_gets_visibility_dict(self):
+        """The comment's owner gets {custom_visibility: <value>} for their own comment."""
+        comment = make_test_comment(owner=TEST_USER, custom_visibility="Visible to only you")
+        with as_user(TEST_USER):
+            result = get_comment_visibility(comment.name)
+        self.assertEqual(result, {"custom_visibility": "Visible to only you"})
+
+    def test_administrator_gets_visibility_dict(self):
+        """Administrator gets {custom_visibility: <value>} for any comment."""
+        comment = make_test_comment(owner=TEST_USER, custom_visibility="Visible to mentioned")
+        with as_user("Administrator"):
+            result = get_comment_visibility(comment.name)
+        self.assertEqual(result, {"custom_visibility": "Visible to mentioned"})
+
+    def test_other_user_gets_none(self):
+        """Any user other than the owner or Administrator gets None back, regardless of the comment's visibility."""
+        comment = make_test_comment(owner=TEST_USER, custom_visibility="Visible to everyone")
+        with as_user(TEST_USER_2):
+            result = get_comment_visibility(comment.name)
+        self.assertIsNone(result)
