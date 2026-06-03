@@ -4,6 +4,7 @@ permissions:
 
 on:
   push:
+    branches: [version-16, version-16-hotfix]
   pull_request:
 
 concurrency:
@@ -38,7 +39,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - uses: actions/cache@v4
         with:
