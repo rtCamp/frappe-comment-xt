@@ -1,5 +1,3 @@
-# Copyright (c) 2026, rtCamp and Contributors
-# See license.txt
 """Visibility-mode coverage of filter_comments_by_visibility plus the timeline integration path through add_comments_in_timeline."""
 
 import frappe
@@ -40,8 +38,8 @@ class TestFilterCommentsByVisibility(IntegrationTestCase):
         make_test_user(TEST_USER_3)
         make_test_tag()
 
-    def test_unset_visibility_is_treated_as_everyone(self):
-        """A comment inserted without custom_visibility is visible to non-owners."""
+    def test_null_visibility_is_treated_as_everyone(self):
+        """A comment with NULL custom_visibility (legacy pre-install rows) is visible to non-owners."""
         raw = frappe.get_doc(
             {
                 "doctype": "Comment",
@@ -50,9 +48,11 @@ class TestFilterCommentsByVisibility(IntegrationTestCase):
                 "reference_name": TEST_TAG,
                 "comment_email": TEST_USER,
                 "comment_by": TEST_USER,
-                "content": "default visibility",
+                "content": "legacy comment",
             }
         ).insert(ignore_permissions=True)
+        # The Custom Field's default ("Visible to everyone") fires on insert; force NULL to simulate a pre-install row.
+        frappe.db.set_value("Comment", raw.name, "custom_visibility", None, update_modified=False)
 
         result = filter_comments_by_visibility(_fetch([raw.name]), TEST_USER_2)
         self.assertEqual([c.name for c in result], [raw.name])

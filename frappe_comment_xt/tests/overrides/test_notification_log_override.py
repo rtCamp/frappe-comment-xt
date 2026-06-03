@@ -1,5 +1,3 @@
-# Copyright (c) 2026, rtCamp and Contributors
-# See license.txt
 """Mention-type Notification Log linkback to the originating comment.
 
 Tests call update_comment_link / after_insert directly on an unsaved doc instead of going through .insert(). This avoids interference from other apps' before_save hooks on Notification Log (e.g. next_crm rewrites `#comment-(\\w+)` -> `#comments` on save, which would silently undo our anchor).

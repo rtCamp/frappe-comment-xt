@@ -1,5 +1,3 @@
-# Copyright (c) 2026, rtCamp and Contributors
-# See license.txt
 """Coverage of the whitelisted comment endpoints: get_all_replies, add_comment_override, update_comment_override, get_comment_visibility."""
 
 from unittest.mock import patch
