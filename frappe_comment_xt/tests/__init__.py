@@ -1,5 +1,5 @@
 """
-Test fixtures for frappe_comment_xt.
+Setup and helpers for FCX test suite.
 """
 
 import contextlib
