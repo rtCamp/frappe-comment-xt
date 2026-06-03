@@ -1,6 +1,6 @@
 # Copyright (c) 2026, rtCamp and Contributors
 # See license.txt
-"""Visibility filtering in get_all_replies, thread-notification gating in add_comment_override, and the edit/update endpoint update_comment_override."""
+"""Coverage of the whitelisted comment endpoints: get_all_replies, add_comment_override, update_comment_override, get_comment_visibility."""
 
 from unittest.mock import patch
 
@@ -428,3 +428,147 @@ class TestGetCommentVisibility(IntegrationTestCase):
         with as_user(TEST_USER_2):
             result = get_comment_visibility(comment.name)
         self.assertIsNone(result)
+
+
+class TestAddCommentOverride(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        make_test_user(TEST_USER)
+        make_test_user(TEST_USER_2)
+        make_test_tag()
+
+    def _set_follow_flag(self, user, value):
+        """Set User.follow_commented_documents via the doc API so cache is invalidated."""
+        doc = frappe.get_doc("User", user)
+        doc.follow_commented_documents = value
+        doc.save(ignore_permissions=True)
+
+    def test_check_permission_on_reference_doc(self):
+        """add_comment_override calls check_permission() on the reference doc before inserting."""
+        captured = []
+        original_check = frappe.model.document.Document.check_permission
+
+        def capturing(self_doc, *args, **kwargs):
+            captured.append((self_doc.doctype, self_doc.name))
+            return original_check(self_doc, *args, **kwargs)
+
+        with (
+            patch.object(frappe.model.document.Document, "check_permission", capturing),
+            as_user(TEST_USER),
+        ):
+            add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="hi",
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+
+        self.assertIn(("Tag", TEST_TAG), captured)
+
+    def test_custom_visibility_defaults_to_everyone(self):
+        """Omitting custom_visibility produces a Comment with custom_visibility = Visible to everyone."""
+        with as_user(TEST_USER):
+            comment = add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="hi",
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+        self.assertEqual(comment.custom_visibility, "Visible to everyone")
+
+    def test_custom_reply_to_defaults_to_none(self):
+        """Omitting custom_reply_to produces a Comment with custom_reply_to set to None."""
+        with as_user(TEST_USER):
+            comment = add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="hi",
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+        self.assertIsNone(comment.custom_reply_to)
+
+    def test_mentions_extracted_from_content(self):
+        """custom_mentions is populated from mention spans in the content."""
+        content = f'<span class="mention" data-id="{TEST_USER_2}">@user2</span> hi'
+        with as_user(TEST_USER):
+            comment = add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content=content,
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+        self.assertEqual([m.user for m in comment.custom_mentions], [TEST_USER_2])
+
+    def test_inline_images_extracted_to_files(self):
+        """Inline base64 images are extracted to File records and the img src is replaced with the file URL."""
+        # 1x1 transparent PNG
+        base64_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        content_with_image = f'<img src="data:image/png;base64,{base64_png}" alt="x"/>'
+
+        with as_user(TEST_USER):
+            comment = add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content=content_with_image,
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+
+        self.assertNotIn("data:image/png;base64", comment.content)
+        self.assertIn("/files/", comment.content)
+
+    def test_follow_commented_documents_on_triggers_follow(self):
+        """When the session user has follow_commented_documents=1, follow_document is invoked with the reference doc."""
+        self._set_follow_flag(TEST_USER, 1)
+
+        with (
+            patch("frappe_comment_xt.overrides.whitelist.comment.follow_document") as mock_follow,
+            as_user(TEST_USER),
+        ):
+            add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="hi",
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+
+        mock_follow.assert_called_once_with("Tag", TEST_TAG, TEST_USER)
+
+    def test_follow_commented_documents_off_does_not_follow(self):
+        """When the session user has follow_commented_documents=0, follow_document is not called."""
+        self._set_follow_flag(TEST_USER, 0)
+
+        with (
+            patch("frappe_comment_xt.overrides.whitelist.comment.follow_document") as mock_follow,
+            as_user(TEST_USER),
+        ):
+            add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="hi",
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+
+        mock_follow.assert_not_called()
+
+    def test_returns_inserted_comment_doc(self):
+        """The function returns the inserted Comment document, which exists in the DB and carries the supplied content."""
+        with as_user(TEST_USER):
+            result = add_comment_override(
+                reference_doctype="Tag",
+                reference_name=TEST_TAG,
+                content="hello world",
+                comment_email=TEST_USER,
+                comment_by=TEST_USER,
+            )
+
+        self.assertEqual(result.doctype, "Comment")
+        self.assertTrue(frappe.db.exists("Comment", result.name))
+        self.assertEqual(result.content, "hello world")
