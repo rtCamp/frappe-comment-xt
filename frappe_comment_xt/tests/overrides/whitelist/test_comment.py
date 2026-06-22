@@ -436,6 +436,11 @@ class TestAddCommentOverride(IntegrationTestCase):
         make_test_user(TEST_USER_2)
         make_test_tag()
 
+    def setUp(self):
+        super().setUp()
+        # Reset the follow flag so tests don't leak state across each other.
+        self._set_follow_flag(TEST_USER, 0)
+
     def _set_follow_flag(self, user, value):
         """Set User.follow_commented_documents via the doc API so cache is invalidated."""
         doc = frappe.get_doc("User", user)
