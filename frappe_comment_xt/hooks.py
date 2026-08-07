@@ -123,8 +123,6 @@ app_include_js = [
 # ---------------
 # Override standard doctype classes
 
-# The override links the comment before NotificationLog.after_insert sends the
-# notification; doc_events cannot guarantee that ordering.
 # nosemgrep: frappe-semgrep.rules.override-doctype-class
 override_doctype_class = {
     "Notification Log": "frappe_comment_xt.overrides.notification_log_override.NotificationLogOverride"
