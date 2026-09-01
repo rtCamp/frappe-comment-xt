@@ -525,6 +525,20 @@ class TestAddCommentOverride(IntegrationTestCase):
         self.assertNotIn("data:image/png;base64", comment.content)
         self.assertIn("/files/", comment.content)
 
+        file_url = comment.content.split('src="', 1)[1].split('"', 1)[0].split("?", 1)[0]
+        self.assertEqual(
+            frappe.db.get_value(
+                "File",
+                {
+                    "file_url": file_url,
+                    "attached_to_doctype": "Tag",
+                    "attached_to_name": TEST_TAG,
+                },
+                "is_private",
+            ),
+            1,
+        )
+
     def test_follow_commented_documents_on_triggers_follow(self):
         """When the session user has follow_commented_documents=1, follow_document is invoked with the reference doc."""
         self._set_follow_flag(TEST_USER, 1)
