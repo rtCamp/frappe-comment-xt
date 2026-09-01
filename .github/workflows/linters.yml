@@ -15,7 +15,7 @@ jobs:
     name: "Frappe Linter"
     runs-on: ubuntu-latest
     container:
-      image: alpine:latest # latest used here for simplicity, not recommended
+      image: alpine:3.22
     defaults:
       run:
         shell: sh
