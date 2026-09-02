@@ -140,6 +140,10 @@ def get_comment_visibility(name: str):
 @frappe.whitelist()
 def get_all_replies(reference_doctype: str, reference_name: str):
     """Get all replies for a comment in a structured format"""
+
+    if not frappe.db.exists(reference_doctype, reference_name):
+        return {}
+
     frappe.has_permission(reference_doctype, "read", doc=reference_name, throw=True)
 
     replies = frappe.get_all(
