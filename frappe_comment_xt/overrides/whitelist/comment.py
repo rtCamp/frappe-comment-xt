@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import frappe
+from frappe import _
 from frappe.core.doctype.file.utils import extract_images_from_html
 from frappe.desk.doctype.notification_log.notification_log import enqueue_create_notification
 from frappe.desk.form.document_follow import follow_document
@@ -28,6 +29,22 @@ def add_comment_override(
     """Allow logged user with permission to read document to add a comment"""
     reference_doc = frappe.get_doc(reference_doctype, reference_name)
     reference_doc.check_permission()
+
+    if custom_reply_to:
+        parent = frappe.db.get_value(
+            "Comment",
+            custom_reply_to,
+            ["reference_doctype", "reference_name"],
+            as_dict=True,
+        )
+        if not parent or (parent.reference_doctype, parent.reference_name) != (
+            reference_doctype,
+            reference_name,
+        ):
+            frappe.throw(
+                _("Cannot reply to a comment on another document"),
+                frappe.PermissionError,
+            )
 
     comment = frappe.new_doc("Comment")
     mentions = get_mention_user(content)
@@ -123,6 +140,12 @@ def get_comment_visibility(name: str):
 @frappe.whitelist()
 def get_all_replies(reference_doctype: str, reference_name: str):
     """Get all replies for a comment in a structured format"""
+
+    if not frappe.db.exists(reference_doctype, reference_name):
+        return {}
+
+    frappe.has_permission(reference_doctype, "read", doc=reference_name, throw=True)
+
     replies = frappe.get_all(
         "Comment",
         filters={
