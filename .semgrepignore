@@ -23,7 +23,7 @@ test*.py
 # Semgrep-action log folder
 .semgrep_logs/
 
-# Github Actions
+# GitHub Actions
 .github/
 
 # Markdown files
