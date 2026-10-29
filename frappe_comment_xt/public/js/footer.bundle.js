@@ -16,14 +16,21 @@ class CustomFormTimeline extends FormTimeline {
     });
     return comment_timeline_contents;
   }
+
+  render_timeline_items() {
+    super.render_timeline_items();
+    // frm.footer is unset during construction; the footer's render_complete handler covers that first render
+    if (this.frm.footer) window.update_comments_timeline?.();
+  }
 }
 
 frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
   constructor(opts) {
     super(opts);
-    // Once the timeline is rendered, setup the replies
+    // Once the timeline is rendered, add visibility icons and replies.
+    // Optional call: timeline.js is loaded async via frappe.require.
     $(this.frm.wrapper).on("render_complete", () => {
-      this.setup_replies();
+      window.update_comments_timeline?.();
     });
   }
 

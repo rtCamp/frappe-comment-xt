@@ -1,16 +1,5 @@
 frappe.require(["/assets/frappe_comment_xt/js/controls/replies.js"]);
 
-/**Enable the HTML Editor field preview mode by default using the provided function */
-const time_line_interval_loop = setInterval(() => {
-  let html_time_line_item = document.querySelectorAll(
-    ".new-timeline > .timeline-items .timeline-item",
-  );
-
-  if (html_time_line_item.length != 0) {
-    update_comments_timeline();
-  }
-}, 300);
-
 function get_comment_visibility_icons(visibility) {
   if (visibility == "Visible to everyone") {
     return `<i class="fa fa-globe visible-to-all"></i>
