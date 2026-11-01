@@ -1,4 +1,5 @@
 import frappe
+from frappe.desk.form.load import add_comments as core_add_comments  # rebound by monkey_patch.patch()
 from frappe.desk.notifications import extract_mentions
 
 
@@ -16,6 +17,10 @@ def get_mention_user(content):
 
 
 def add_comments_in_timeline(doc, docinfo):
+    # patched process-wide; other sites on the bench keep core behaviour
+    if "frappe_comment_xt" not in frappe.get_installed_apps():
+        return core_add_comments(doc, docinfo)
+
     # divide comments into separate lists
     docinfo.comments = []
     docinfo.shared = []
