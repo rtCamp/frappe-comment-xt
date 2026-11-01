@@ -1,5 +1,3 @@
-frappe.require(["/assets/frappe_comment_xt/js/controls/replies.js"]);
-
 function get_comment_visibility_icons(visibility) {
   if (visibility == "Visible to everyone") {
     return `<i class="fa fa-globe visible-to-all"></i>
@@ -55,19 +53,20 @@ function add_visibility_icons(time_line_item, visibility) {
   ).innerHTML += update_the_comment_visibility(visibility);
 }
 
-function update_comments_timeline() {
-  // Select all the timeline comments and replies
-  let html_time_line_items = document.querySelectorAll(
-    ".new-timeline > .timeline-items > .timeline-item",
-  );
+function update_comments_timeline(frm) {
+  // Only this form's top-level items: hidden pages of other doctypes keep their timelines in the DOM
+  let html_time_line_items =
+    frm.timeline.timeline_items_wrapper[0].querySelectorAll(
+      ":scope > .timeline-item",
+    );
 
   // Add the visibility icons to the comments
   for (let index = 0; index < html_time_line_items.length; index++) {
     // if the comment visibility are already added, skip
     if (html_time_line_items[index].querySelector(".visibility-info")) {
-      break;
+      continue;
     }
-    update_time_line(html_time_line_items[index]);
+    update_time_line(html_time_line_items[index], frm);
   }
 
   let replies_loaded = true;
@@ -75,32 +74,24 @@ function update_comments_timeline() {
   for (let index = 0; index < html_time_line_items.length; index++) {
     // if the reply button is already added, skip
     if (html_time_line_items[index].querySelector(".reply-btn")) {
-      break;
+      continue;
     }
     if (html_time_line_items[index].dataset.doctype == "Comment") {
-      add_reply_button(html_time_line_items[index]);
+      add_reply_button(html_time_line_items[index], frm);
       replies_loaded = false;
     }
   }
 
   if (!replies_loaded) {
-    this.cur_frm.footer.setup_replies();
+    frm.footer.setup_replies();
   }
 }
 
-function button_handle(event) {
-  let html_time_line_items = document.querySelectorAll(
-    ".new-timeline > .timeline-items .timeline-item",
-  );
-
-  for (let index = 0; index < html_time_line_items.length; index++) {
-    if (html_time_line_items[index].dataset.name == event.target.dataset.name) {
-      return button_override(html_time_line_items[index], event.target);
-    }
-  }
+function docinfo_comment(frm, name) {
+  return (frm.get_docinfo()?.comments || []).find((c) => c.name === name);
 }
 
-function update_time_line(time_line_item) {
+function update_time_line(time_line_item, frm) {
   if (!("doctype" in time_line_item.dataset)) {
     return;
   }
@@ -109,29 +100,33 @@ function update_time_line(time_line_item) {
     return;
   }
 
-  frappe.call({
-    method:
-      "frappe_comment_xt.overrides.whitelist.comment.get_comment_visibility",
-    args: {
-      name: time_line_item.dataset.name,
-    },
-    callback: (res) => {
-      add_visibility_icons(time_line_item, res?.message?.custom_visibility);
-    },
-  });
+  // docinfo already carries custom_visibility, so no request per comment. A comment posted
+  // moments ago is not in docinfo until the realtime update lands, so ask for that one only.
+  const comment = docinfo_comment(frm, time_line_item.dataset.name);
+  if (comment) {
+    add_visibility_icons(time_line_item, comment.custom_visibility);
+  } else {
+    frappe.call({
+      method:
+        "frappe_comment_xt.overrides.whitelist.comment.get_comment_visibility",
+      args: { name: time_line_item.dataset.name },
+      callback: (res) => {
+        add_visibility_icons(time_line_item, res?.message?.custom_visibility);
+      },
+    });
+  }
 
   let button = time_line_item.querySelector(".custom-actions button");
 
   if (!button) {
     return;
   }
-  button.dataset.name = time_line_item.dataset.name;
-
-  // Remove the event listener
-  button.removeEventListener("click", button_handle, true);
-
-  // Add the event listener
-  button.addEventListener("click", button_handle, true);
+  // Items are rebuilt on every render and skipped once decorated, so one listener each
+  button.addEventListener(
+    "click",
+    () => button_override(time_line_item, button, frm),
+    true,
+  );
 
   time_line_item
     .querySelector(".custom-actions")
@@ -143,33 +138,37 @@ function update_time_line(time_line_item) {
     });
 }
 
-function button_override(time_line_item, button) {
+function button_override(time_line_item, button, frm) {
   if (
     time_line_item
       .querySelector(".custom-actions")
       .classList.contains("save-open")
   ) {
-    handle_save(time_line_item, button);
+    handle_save(time_line_item, frm);
   } else {
     handle_edit(time_line_item, button);
   }
 }
 
-function handle_save(time_line_item, button) {
+function handle_save(time_line_item, frm) {
+  const visibility = time_line_item.querySelector("#visibility").value;
   frappe.call({
     method: "frappe.desk.form.utils.update_comment",
     args: {
       name: time_line_item.dataset.name,
       content: time_line_item.querySelector(".comment-edit-box .ql-editor")
         .innerHTML,
-      custom_visibility: time_line_item.querySelector("#visibility").value,
+      custom_visibility: visibility,
     },
     callback: () => {
       time_line_item.querySelector(".timeline-comment").remove();
       time_line_item
         .querySelector(".custom-actions")
         .classList.remove("save-open");
-      update_time_line(time_line_item);
+      // keep docinfo in step so the next render shows the saved value
+      const comment = docinfo_comment(frm, time_line_item.dataset.name);
+      if (comment) comment.custom_visibility = visibility;
+      add_visibility_icons(time_line_item, visibility);
     },
   });
 }

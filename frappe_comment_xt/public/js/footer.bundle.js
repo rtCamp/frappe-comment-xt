@@ -9,7 +9,8 @@ class CustomFormTimeline extends FormTimeline {
     (this.doc_info.comments || []).forEach((comment) => {
       // NOTE: The comment was being added on the timeline even if it was a reply on refresh
       // if the comment is a reply, don't add it to the timeline
-      if (comment.custom_reply_to !== null) {
+      // truthy, not !== null: an unpatched response omits the field and must not blank the timeline
+      if (comment.custom_reply_to) {
         return;
       }
       comment_timeline_contents.push(this.get_comment_timeline_item(comment));
@@ -19,21 +20,13 @@ class CustomFormTimeline extends FormTimeline {
 
   render_timeline_items() {
     super.render_timeline_items();
-    // frm.footer is unset during construction; the footer's render_complete handler covers that first render
-    if (this.frm.footer) window.update_comments_timeline?.();
+    // frm.footer is unset during construction; Frappe's own render_complete -> footer.refresh()
+    // re-renders once the form is up. The scripts load async, hence the optional call.
+    if (this.frm.footer) window.update_comments_timeline?.(this.frm);
   }
 }
 
 frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
-  constructor(opts) {
-    super(opts);
-    // Once the timeline is rendered, add visibility icons and replies.
-    // Optional call: timeline.js is loaded async via frappe.require.
-    $(this.frm.wrapper).on("render_complete", () => {
-      window.update_comments_timeline?.();
-    });
-  }
-
   make_timeline() {
     this.frm.timeline = new CustomFormTimeline({
       parent: this.wrapper.find(".timeline"),
@@ -74,7 +67,7 @@ frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
             })
             .finally(() => {
               this.frm.comment_box.enable();
-              update_comments_timeline();
+              window.update_comments_timeline?.(this.frm);
             });
           this.refresh();
         }
@@ -84,9 +77,11 @@ frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
 
   setup_replies() {
     // A public interface to the footer to render threaded replies
-    const docname = this.frm.docname;
-    const doctype = this.frm.doctype;
-    const $timelineItems = $("div.new-timeline > div.timeline-items");
+    const frm = this.frm;
+    const docname = frm.docname;
+    const doctype = frm.doctype;
+    // Only this form's timeline: hidden pages of other doctypes keep their timelines in the DOM
+    const $timelineItems = frm.timeline.timeline_items_wrapper;
 
     frappe.call({
       method: "frappe_comment_xt.overrides.whitelist.comment.get_all_replies",
@@ -107,7 +102,7 @@ frappe.ui.form.Footer = class extends frappe.ui.form.Footer {
           .each(function () {
             const $item = $(this);
             const commentId = $item.data("name");
-            render_replies($item, commentId, res.message);
+            render_replies($item, commentId, res.message, false, 1, frm);
           });
       },
     });
