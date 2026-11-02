@@ -555,7 +555,7 @@ class TestAddCommentOverride(IntegrationTestCase):
                 comment_by=TEST_USER,
             )
 
-        mock_follow.assert_called_once_with("Tag", TEST_TAG, TEST_USER)
+        mock_follow.assert_called_once_with("Tag", TEST_TAG)
 
     def test_follow_commented_documents_off_does_not_follow(self):
         """When the session user has follow_commented_documents=0, follow_document is not called."""

@@ -65,7 +65,7 @@ def add_comment_override(
     comment.insert(ignore_permissions=True)
 
     if frappe.get_cached_value("User", frappe.session.user, "follow_commented_documents"):
-        follow_document(comment.reference_doctype, comment.reference_name, frappe.session.user)
+        follow_document(comment.reference_doctype, comment.reference_name)
 
     try:
         # Notify thread participants if the comment is visible to everyone

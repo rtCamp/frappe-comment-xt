@@ -1,7 +1,7 @@
 // Maximum limit of nested threads allowed
 const REPLY_LEVEL_LIMIT = 7;
 
-function add_reply_button(time_line_item) {
+function add_reply_button(time_line_item, frm) {
   /* Add reply button to the parent comment */
   if ($(time_line_item).find(".custom-actions .reply-btn").length) {
     return;
@@ -9,7 +9,7 @@ function add_reply_button(time_line_item) {
   const replyButton = $("<button>")
     .addClass("btn btn-xs btn-link reply-btn")
     .html('<i class="fa fa-reply"></i> Reply')
-    .on("click", () => handle_reply(time_line_item));
+    .on("click", () => handle_reply(time_line_item, frm));
 
   $(time_line_item).find(".custom-actions").append(replyButton);
 }
@@ -20,6 +20,7 @@ function render_replies(
   allReplies,
   decrease_margin = false,
   comment_level = 1,
+  frm,
 ) {
   /*
    * Recursively render replies for a comment
@@ -92,7 +93,7 @@ function render_replies(
     const $replyButton = $("<button>")
       .addClass("btn btn-xs btn-link reply-btn")
       .html('<i class="fa fa-reply"></i> Reply')
-      .on("click", () => handle_reply("#comment-" + reply.name));
+      .on("click", () => handle_reply("#comment-" + reply.name, frm));
 
     $replyContainer.append($replyContent);
 
@@ -114,7 +115,7 @@ function render_replies(
         $("<a>")
           .addClass("dropdown-item")
           .html("Copy Link")
-          .on("click", () => handle_reply_copy("#comment-" + reply.name)),
+          .on("click", () => handle_reply_copy("#comment-" + reply.name, frm)),
       );
 
     // if owner or administrator, add the delete button
@@ -135,7 +136,7 @@ function render_replies(
       .addClass("btn btn-xs small")
       .html("Edit")
       .on("click", () =>
-        handle_reply_edit(commentSelector, "#comment-" + reply.name),
+        handle_reply_edit(commentSelector, "#comment-" + reply.name, frm),
       );
 
     moreButton.append(dropdownMenu);
@@ -158,11 +159,12 @@ function render_replies(
       allReplies,
       true,
       comment_level + 1,
+      frm,
     );
   });
 }
 
-function addThreadedReply(commentSelector, doctype, docname) {
+function addThreadedReply(commentSelector, frm) {
   /*
    * Entry point to fetch and render replies for a comment
    * This will render the comment tree starting the given comment
@@ -175,8 +177,8 @@ function addThreadedReply(commentSelector, doctype, docname) {
   frappe.call({
     method: "frappe_comment_xt.overrides.whitelist.comment.get_all_replies",
     args: {
-      reference_name: docname,
-      reference_doctype: doctype,
+      reference_name: frm.docname,
+      reference_doctype: frm.doctype,
     },
     callback: (res) => {
       if (res.exc) {
@@ -194,12 +196,13 @@ function addThreadedReply(commentSelector, doctype, docname) {
         res.message,
         isReply,
         commentLevel + 1,
+        frm,
       );
     },
   });
 }
 
-function handle_reply(time_line_item) {
+function handle_reply(time_line_item, frm) {
   /*
    * Handle the reply button click event
    */
@@ -285,7 +288,7 @@ function handle_reply(time_line_item) {
     const replyContent = replyControl.get_value();
     const visibility = visibilitySelect.find("select").val();
     if (strip_html(replyContent).trim() != "" || replyContent.includes("img")) {
-      submit_reply($timeLineItem, replyContent, visibility);
+      submit_reply($timeLineItem, replyContent, visibility, frm);
     }
   });
 
@@ -303,15 +306,15 @@ function handle_reply(time_line_item) {
   replyContainer.find(".ql-editor.ql-blank").focus();
 }
 
-function submit_reply(time_line_item, content, visibility) {
+function submit_reply(time_line_item, content, visibility, frm) {
   /*
    * Submit the reply to the server and update the comments tree for the comment
    */
   frappe.call({
     method: "frappe.desk.form.utils.add_comment",
     args: {
-      reference_doctype: this.cur_frm.doctype,
-      reference_name: this.cur_frm.docname,
+      reference_doctype: frm.doctype,
+      reference_name: frm.docname,
       custom_reply_to: $(time_line_item).data("name") || null,
       content: content,
       custom_visibility: visibility,
@@ -322,18 +325,14 @@ function submit_reply(time_line_item, content, visibility) {
       if (r.message) {
         $(time_line_item).find(".reply-container").remove();
         frappe.utils.play_sound("click");
-        update_comments_timeline();
-        addThreadedReply(
-          time_line_item,
-          this.cur_frm.doctype,
-          this.cur_frm.docname,
-        );
+        update_comments_timeline(frm);
+        addThreadedReply(time_line_item, frm);
       }
     },
   });
 }
 
-function handle_reply_copy(commentSelector) {
+function handle_reply_copy(commentSelector, frm) {
   /*
    * Copy the comment URL to the clipboard
    */
@@ -341,7 +340,7 @@ function handle_reply_copy(commentSelector) {
   const commentId = $comment.data("name");
   const currentUrl =
     frappe.urllib.get_base_url() +
-    frappe.utils.get_form_link(this.cur_frm.doctype, this.cur_frm.docname);
+    frappe.utils.get_form_link(frm.doctype, frm.docname);
   const commentUrl = `${currentUrl}#comment-${commentId}`;
   frappe.utils.copy_to_clipboard(commentUrl);
 }
@@ -374,7 +373,7 @@ function handle_reply_delete(commentSelector) {
   });
 }
 
-function handle_reply_edit(parentComment, commentSelector) {
+function handle_reply_edit(parentComment, commentSelector, frm) {
   /*
    * Edit the comment, prepare the edit mode and hide the read mode
    * Also handle the save and dismiss actions for the edit mode
@@ -387,8 +386,6 @@ function handle_reply_edit(parentComment, commentSelector) {
   const $readMode = $comment.find(".read-mode");
   const $editMode = $comment.find(".edit-mode");
   const commentId = $comment.data("name");
-  const doctype = this.cur_frm.doctype;
-  const docname = this.cur_frm.docname;
 
   $readMode.hide();
   $editMode.show().empty();
@@ -477,7 +474,7 @@ function handle_reply_edit(parentComment, commentSelector) {
           $editMode.hide();
           $readMode.show();
 
-          addThreadedReply(parentComment, doctype, docname);
+          addThreadedReply(parentComment, frm);
           frappe.show_alert({
             message: __("Comment updated"),
             indicator: "green",
