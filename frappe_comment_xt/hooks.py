@@ -123,7 +123,7 @@ app_include_js = [
 # ---------------
 # Override standard doctype classes
 
-# nosemgrep
+# nosemgrep: frappe-semgrep.rules.override-doctype-class
 override_doctype_class = {
     "Notification Log": "frappe_comment_xt.overrides.notification_log_override.NotificationLogOverride"
 }
@@ -206,12 +206,12 @@ override_whitelisted_methods = {
 
 # Request Events
 # ----------------
-# before_request = ["frappe_comment_xt.utils.before_request"]
+before_request = ["frappe_comment_xt.monkey_patch.patch"]
 # after_request = ["frappe_comment_xt.utils.after_request"]
 
 # Job Events
 # ----------
-# before_job = ["frappe_comment_xt.utils.before_job"]
+before_job = ["frappe_comment_xt.monkey_patch.patch"]
 # after_job = ["frappe_comment_xt.utils.after_job"]
 
 # User Data Protection
