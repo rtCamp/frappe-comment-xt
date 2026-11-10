@@ -77,7 +77,11 @@ app_include_js = [
 # ------------
 
 # before_install = "frappe_comment_xt.install.before_install"
-# after_install = "frappe_comment_xt.install.after_install"
+after_install = "frappe_comment_xt.install.after_install"
+
+# Custom fields live in setup/custom_fields.json. create_custom_fields(..., update=True)
+# is idempotent, so it is safe to run on every migrate.
+after_migrate = "frappe_comment_xt.setup.install"
 
 # Uninstallation
 # ------------
@@ -163,18 +167,8 @@ override_doctype_class = {
 
 # Fixtures
 # ----------
-fixtures = [
-    {
-        "dt": "Custom Field",
-        "filters": [
-            [
-                "dt",
-                "in",
-                ["Comment"],
-            ]
-        ],
-    },
-]
+# Custom fields are installed from setup/custom_fields.json (see after_migrate).
+fixtures = []
 
 # Testing
 # -------
