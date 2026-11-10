@@ -1,0 +1,33 @@
+{
+  "Comment": [
+    {
+      "fieldname": "custom_section_break_kr3ge",
+      "fieldtype": "Section Break",
+      "insert_after": "ip_address"
+    },
+    {
+      "default": "Visible to everyone",
+      "fieldname": "custom_visibility",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "insert_after": "custom_section_break_kr3ge",
+      "label": "Visibility",
+      "options": "Visible to everyone\nVisible to only you\nVisible to mentioned"
+    },
+    {
+      "fieldname": "custom_mentions",
+      "fieldtype": "Table MultiSelect",
+      "insert_after": "custom_visibility",
+      "label": "Mentions",
+      "options": "User Group Member"
+    },
+    {
+      "fieldname": "custom_reply_to",
+      "fieldtype": "Link",
+      "insert_after": "custom_mentions",
+      "label": "Reply To",
+      "options": "Comment",
+      "read_only": 1
+    }
+  ]
+}
